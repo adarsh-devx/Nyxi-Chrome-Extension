@@ -59,7 +59,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, setIsOpe
           updateSettings(parsed as Partial<AppSettings>);
           alert('Settings imported successfully!');
         }
-      } catch (err) {
+      } catch {
         alert('Invalid settings file format.');
       }
     };

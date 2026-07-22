@@ -18,10 +18,11 @@ export const WallpaperRenderer: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const videoSrc = getWallpaperUrl(activeWallpaper);
+
   // Synchronize HTML5 Video properties
   useEffect(() => {
     const video = videoRef.current;
-    const videoSrc = getWallpaperUrl(activeWallpaper);
     if (!video || activeWallpaper.type !== 'video' || !videoSrc) return;
 
     video.muted = isVideoMuted;
@@ -32,7 +33,7 @@ export const WallpaperRenderer: React.FC = () => {
     } else {
       video.pause();
     }
-  }, [activeWallpaper.id, getWallpaperUrl(activeWallpaper), isVideoPlaying, isVideoMuted, shouldLoop]);
+  }, [activeWallpaper.id, activeWallpaper.type, videoSrc, isVideoPlaying, isVideoMuted, shouldLoop]);
 
   // Dynamic Stars Particle Animation Loop
   useEffect(() => {
@@ -47,7 +48,7 @@ export const WallpaperRenderer: React.FC = () => {
     let animationId: number;
     const particles: ParticleNode[] = [];
     const maxParticles = 120;
-    const mouse = { x: -1000, y: -1000, radius: 180 };
+    const mouse = { x: -1000, y: -1000 };
 
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
@@ -84,72 +85,34 @@ export const WallpaperRenderer: React.FC = () => {
     const drawParticles = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Color base on accent color
       const accent = settings.accentColor;
 
       particles.forEach((p) => {
-        // Move particle
         p.x += p.vx;
         p.y += p.vy;
 
-        // Wrap around boundaries
         if (p.x < 0) p.x = canvas.width;
         if (p.x > canvas.width) p.x = 0;
         if (p.y < 0) p.y = canvas.height;
         if (p.y > canvas.height) p.y = 0;
 
-        // Gravity attraction fields (mouse push)
-        const dx = p.x - mouse.x;
-        const dy = p.y - mouse.y;
+        // Proximity glow to mouse cursor
+        const dx = mouse.x - p.x;
+        const dy = mouse.y - p.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        let forceX = 0;
-        let forceY = 0;
-
-        if (dist < mouse.radius) {
-          // Push away force
-          const force = (mouse.radius - dist) / mouse.radius;
-          forceX = (dx / dist) * force * 1.2;
-          forceY = (dy / dist) * force * 1.2;
+        if (dist < 180) {
+          p.alpha = p.baseAlpha + (1 - dist / 180) * 0.5;
+        } else {
+          p.alpha = p.baseAlpha;
         }
-
-        // Apply visual drift back to natural movement
-        p.x += forceX;
-        p.y += forceY;
-
-        // Animate twinkle/alpha
-        p.alpha += (p.baseAlpha - p.alpha) * 0.05;
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = accent;
         ctx.globalAlpha = p.alpha;
-        ctx.shadowColor = accent;
-        ctx.shadowBlur = 8;
         ctx.fill();
-        ctx.shadowBlur = 0; // reset
       });
-
-      // Draw faint connections between close particles to make a beautiful neural network style constellation
-      ctx.globalAlpha = 0.08;
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const p1 = particles[i];
-          const p2 = particles[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < 100) {
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-          }
-        }
-      }
 
       animationId = requestAnimationFrame(drawParticles);
     };
@@ -162,48 +125,47 @@ export const WallpaperRenderer: React.FC = () => {
       document.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animationId);
     };
-  }, [activeWallpaper, settings.accentColor]);
+  }, [activeWallpaper.id, settings.accentColor]);
 
-  // Styling properties
-  const backgroundStyle: React.CSSProperties = {
-    filter: `brightness(var(--bg-brightness))`,
-    transition: 'filter 0.5s ease, opacity 0.5s ease',
+  // CSS Filter Styles
+  const backgroundFilterStyle: React.CSSProperties = {
+    filter: `blur(${settings.blur}px) brightness(${settings.brightness}%)`,
+    transition: 'filter 0.5s ease',
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full -z-55 overflow-hidden select-none pointer-events-none bg-slate-950">
-      {/* 1. Static/Uploaded Image Background */}
+    <div className="fixed inset-0 w-full h-full -z-10 overflow-hidden pointer-events-none select-none">
+      {/* 1. Static/Preset Image Wallpaper */}
       {activeWallpaper.type === 'image' && (
         <img
-          src={getWallpaperUrl(activeWallpaper)}
-          alt=""
-          style={backgroundStyle}
-          className="w-full h-full object-cover select-none"
+          src={videoSrc}
+          alt={activeWallpaper.name}
+          className="w-full h-full object-cover animate-fade-in"
+          style={backgroundFilterStyle}
         />
       )}
 
-      {/* 2. Uploaded Video Background */}
+      {/* 2. Video Loop Wallpaper */}
       {activeWallpaper.type === 'video' && (
         <video
           ref={videoRef}
-          src={getWallpaperUrl(activeWallpaper)}
-          style={backgroundStyle}
-          className="w-full h-full object-cover select-none"
+          src={videoSrc}
+          className="w-full h-full object-cover animate-fade-in"
+          style={backgroundFilterStyle}
           playsInline
+          muted={isVideoMuted}
+          loop={shouldLoop}
+          autoPlay
         />
       )}
 
-      {/* 3. Interactive Particle Canvas Background */}
+      {/* 3. Canvas Dynamic Stars Wallpaper */}
       {activeWallpaper.type === 'dynamic' && (
-        <canvas
-          ref={canvasRef}
-          style={backgroundStyle}
-          className="w-full h-full object-cover select-none"
-        />
+        <div className="w-full h-full relative" style={backgroundFilterStyle}>
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950" />
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+        </div>
       )}
-
-      {/* Vignette Overlay for Premium Depth */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(0,0,0,0.45))] pointer-events-none" />
     </div>
   );
 };

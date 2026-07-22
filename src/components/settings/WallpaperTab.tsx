@@ -48,7 +48,7 @@ export const WallpaperTab: React.FC = () => {
 
     try {
       await uploadWallpaper(file);
-    } catch (err) {
+    } catch {
       setUploadError('Failed to upload wallpaper. Try a smaller file.');
     } finally {
       setIsUploading(false);

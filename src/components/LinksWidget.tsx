@@ -65,17 +65,14 @@ export const LinksWidget: React.FC = () => {
     const fetchBookmarks = () => {
       if (typeof chrome !== 'undefined' && chrome.bookmarks && chrome.bookmarks.getTree) {
         chrome.bookmarks.getTree((tree: chrome.bookmarks.BookmarkTreeNode[]) => {
-          // Typically the first node is root, followed by Bookmarks Bar and Other Bookmarks
           const rootNode = tree[0];
           if (rootNode && rootNode.children) {
-            // Find Bookmarks Bar or merge children
             const bar = rootNode.children.find((c: chrome.bookmarks.BookmarkTreeNode) => c.title.toLowerCase().includes('bar') || c.id === '1');
             const items = bar ? bar.children || [] : rootNode.children;
             setChromeBookmarks(items as ChromeBookmarkNode[]);
           }
         });
       } else {
-        // Fallback for local development
         setChromeBookmarks(mockChromeBookmarks);
       }
     };
@@ -123,10 +120,8 @@ export const LinksWidget: React.FC = () => {
     }
   };
 
-  // Recursive renderer for native folder-structured bookmarks
   const renderBookmarkNode = (node: ChromeBookmarkNode) => {
     if (node.url) {
-      // It's a bookmark leaf
       return (
         <a
           key={node.id}
@@ -146,9 +141,8 @@ export const LinksWidget: React.FC = () => {
       );
     }
 
-    // It's a folder
     return (
-      <div key={node.id} className="flex flex-col gap-1-5 p-1 rounded-xl bg-white/5 border border-white/5">
+      <div key={node.id} className="flex flex-col gap-1.5 p-1 rounded-xl bg-white/5 border border-white/5">
         <div className="flex items-center gap-2 px-3 py-2 text-white/50 text-xs font-semibold uppercase tracking-wider">
           <Folder className="w-4 h-4 text-[var(--accent-color)]" />
           <span className="truncate">{node.title}</span>
@@ -193,10 +187,10 @@ export const LinksWidget: React.FC = () => {
         {activeTab === 'quick' && (
           <button
             onClick={() => setIsAdding(!isAdding)}
-            className="p-1-5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+            className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             title="Add Quick Link"
           >
-            <Plus className="w-4-5 h-4-5" />
+            <Plus className="w-4.5 h-4.5" />
           </button>
         )}
       </div>
@@ -214,18 +208,17 @@ export const LinksWidget: React.FC = () => {
                 {/* Delete button */}
                 <button
                   onClick={(e) => handleDeleteLink(link.id, e)}
-                  className="absolute top-1-5 right-1-5 p-1 rounded-full bg-black/40 hover:bg-red-500/70 text-white/40 hover:text-white opacity-0 group-hover-opacity-100 transition-all"
+                  className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/40 hover:bg-red-500/70 text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
                   title="Remove Link"
                 >
-                  <X className="w-3-5 h-3-5" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
 
-                <div className="w-12 h-12 rounded-xl bg-white-5 border border-white-5 flex items-center justify-center mb-2-5 transition-transform group-hover-scale-105">
+                <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
                   <img
                     src={getFaviconUrl(link.url)}
                     alt=""
                     onError={(e) => {
-                      // Fallback to globe icon
                       e.currentTarget.style.display = 'none';
                       const sibling = e.currentTarget.nextElementSibling;
                       if (sibling) sibling.removeAttribute('style');
@@ -264,12 +257,12 @@ export const LinksWidget: React.FC = () => {
               onClick={() => setIsAdding(false)}
               className="text-white/50 hover:text-white transition-colors"
             >
-              <X className="w-4-5 h-4-5" />
+              <X className="w-4.5 h-4.5" />
             </button>
           </div>
 
           <form onSubmit={handleAddLink} className="flex flex-col gap-4 mt-2">
-            <div className="flex flex-col gap-1-5">
+            <div className="flex flex-col gap-1.5">
               <label className="text-white/60 text-xs font-semibold tracking-wider uppercase">Title</label>
               <input
                 type="text"
@@ -280,7 +273,7 @@ export const LinksWidget: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-slate-950/40 border border-white/10 outline-none text-white text-sm focus:border-[var(--accent-color)]"
               />
             </div>
-            <div className="flex flex-col gap-1-5">
+            <div className="flex flex-col gap-1.5">
               <label className="text-white/60 text-xs font-semibold tracking-wider uppercase">URL</label>
               <input
                 type="text"
@@ -294,7 +287,7 @@ export const LinksWidget: React.FC = () => {
 
             <button
               type="submit"
-              className="mt-2 py-2-5 rounded-lg font-bold text-white text-sm btn-accent"
+              className="mt-2 py-2.5 rounded-lg font-bold text-white text-sm btn-accent"
             >
               Add Link
             </button>

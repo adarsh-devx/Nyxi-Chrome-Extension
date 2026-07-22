@@ -36,7 +36,7 @@ export const SearchWidget: React.FC = () => {
   const [isFocused, setIsFocused] = useState(false);
 
   const activeEngineKey = settings.searchEngine;
-  const activeEngine = engineData[activeEngineKey];
+  const activeEngine = engineData[activeEngineKey] || engineData.google;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +66,9 @@ export const SearchWidget: React.FC = () => {
         className={`search-bar ${isFocused ? 'search-bar-focused' : ''}`}
       >
         {activeEngineKey === 'custom' ? (
-          <Globe className="w-5 h-5 text-white-55 transition-colors duration-300" />
+          <Globe className="w-5 h-5 text-white/55 transition-colors duration-300" />
         ) : (
-          <Search className="w-5 h-5 text-white-55 transition-colors duration-300" />
+          <Search className="w-5 h-5 text-white/55 transition-colors duration-300" />
         )}
         <input
           type="text"
@@ -82,7 +82,7 @@ export const SearchWidget: React.FC = () => {
         />
         <button
           type="submit"
-          className="text-white-55 hover-text-white transition-colors duration-300 focus:outline-none"
+          className="text-white/55 hover:text-white transition-colors duration-300 focus:outline-none"
           aria-label="Search"
         >
           <Search className="w-4 h-4" />
