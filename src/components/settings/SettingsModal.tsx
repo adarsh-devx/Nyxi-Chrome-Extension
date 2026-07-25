@@ -23,6 +23,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('wallpaper');
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
+  const [isContentReady, setIsContentReady] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
@@ -32,8 +33,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     if (isOpen) {
       setIsRendered(true);
       setIsClosing(false);
+      // Defer heavy tab DOM node creation by 1 frame so slide-in animation starts instantly with 0 jank
+      const raf = requestAnimationFrame(() => {
+        setIsContentReady(true);
+      });
+      return () => cancelAnimationFrame(raf);
     } else if (isRendered) {
       setIsClosing(true);
+      setIsContentReady(false);
       const timer = setTimeout(() => {
         setIsRendered(false);
         setIsClosing(false);
@@ -51,7 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
         firstFocusable?.focus();
-      }, 40);
+      }, 50);
     } else if (previousActiveElementRef.current && document.body.contains(previousActiveElementRef.current)) {
       previousActiveElementRef.current.focus();
     }
@@ -162,10 +169,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
         {/* Tab Content Panes */}
         <main className="w-full" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-          {activeTab === 'wallpaper' && <WallpaperTabContent />}
-          {activeTab === 'widgets' && <WidgetsTabContent />}
-          {activeTab === 'filters' && <FiltersTabContent />}
-          {activeTab === 'data' && <DataTabContent />}
+          {isContentReady && (
+            <>
+              {activeTab === 'wallpaper' && <WallpaperTabContent />}
+              {activeTab === 'widgets' && <WidgetsTabContent />}
+              {activeTab === 'filters' && <FiltersTabContent />}
+              {activeTab === 'data' && <DataTabContent />}
+            </>
+          )}
         </main>
       </div>
     </div>
