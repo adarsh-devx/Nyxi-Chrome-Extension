@@ -21,25 +21,10 @@ const TABS: { key: SettingsTabKey; label: string; icon: React.ReactNode }[] = [
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('wallpaper');
-  const [isContentReady, setIsContentReady] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
-  // Keep the opening frame light; mount the heavy tab content after the shell animates in.
-  useEffect(() => {
-    if (!isOpen) {
-      setIsContentReady(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setIsContentReady(true);
-    }, 190);
-
-    return () => window.clearTimeout(timer);
-  }, [isOpen]);
-
-  // Focus Restore: Capture activeElement when modal opens, restore on close.
+  // Focus Restore: Capture activeElement when modal opens, restore on close
   useEffect(() => {
     if (isOpen) {
       previousActiveElementRef.current = document.activeElement as HTMLElement | null;
@@ -99,20 +84,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, activeTab, onClose]);
 
-  if (!isOpen) return null;
-
   return (
     <div
-      className="nyxi-settings-overlay"
+      className={`nyxi-settings-overlay ${isOpen ? 'open' : ''}`}
       role="dialog"
       aria-modal="true"
+      aria-hidden={!isOpen}
       aria-labelledby="settings-modal-title"
     >
       {/* Backdrop */}
       <div className="nyxi-settings-backdrop" onClick={onClose} />
 
       {/* Main Glass Modal Container */}
-      <div ref={containerRef} className="nyxi-settings-container custom-scrollbar" tabIndex={-1}>
+      <div
+        ref={containerRef}
+        tabIndex={-1}
+        className="nyxi-settings-container custom-scrollbar outline-none"
+      >
         {/* Header */}
         <header className="nyxi-settings-header">
           <div className="nyxi-settings-title" id="settings-modal-title">
@@ -151,18 +139,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           })}
         </nav>
 
-        {/* Tab Content Panes */}
+        {/* Tab Content Panes - Mounted & Pre-loaded for 0ms Instant Response */}
         <main className="w-full" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-          {isContentReady ? (
-            <>
-              {activeTab === 'wallpaper' && <WallpaperTabContent />}
-              {activeTab === 'widgets' && <WidgetsTabContent />}
-              {activeTab === 'filters' && <FiltersTabContent />}
-              {activeTab === 'data' && <DataTabContent />}
-            </>
-          ) : (
-            <div className="nyxi-settings-panel-placeholder" aria-hidden="true" />
-          )}
+          {activeTab === 'wallpaper' && <WallpaperTabContent />}
+          {activeTab === 'widgets' && <WidgetsTabContent />}
+          {activeTab === 'filters' && <FiltersTabContent />}
+          {activeTab === 'data' && <DataTabContent />}
         </main>
       </div>
     </div>
