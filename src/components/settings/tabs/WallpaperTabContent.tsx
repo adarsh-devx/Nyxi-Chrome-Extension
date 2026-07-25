@@ -229,7 +229,7 @@ export const WallpaperTabContent: React.FC = () => {
                       src={mediaUrl}
                       alt={item.name}
                       className="nyxi-gallery-img"
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                     />
                   )}

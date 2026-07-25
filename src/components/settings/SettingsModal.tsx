@@ -21,21 +21,33 @@ const TABS: { key: SettingsTabKey; label: string; icon: React.ReactNode }[] = [
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('wallpaper');
+  const [isContentReady, setIsContentReady] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
-  // Focus Restore: Capture activeElement when modal opens, restore on close
+  // Keep the opening frame light; mount the heavy tab content after the shell animates in.
+  useEffect(() => {
+    if (!isOpen) {
+      setIsContentReady(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsContentReady(true);
+    }, 190);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
+
+  // Focus Restore: Capture activeElement when modal opens, restore on close.
   useEffect(() => {
     if (isOpen) {
       previousActiveElementRef.current = document.activeElement as HTMLElement | null;
-      setTimeout(() => {
-        const firstFocusable = containerRef.current?.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        firstFocusable?.focus();
-      }, 30);
+      requestAnimationFrame(() => {
+        containerRef.current?.focus({ preventScroll: true });
+      });
     } else if (previousActiveElementRef.current && document.body.contains(previousActiveElementRef.current)) {
-      previousActiveElementRef.current.focus();
+      previousActiveElementRef.current.focus({ preventScroll: true });
     }
   }, [isOpen]);
 
@@ -100,7 +112,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       <div className="nyxi-settings-backdrop" onClick={onClose} />
 
       {/* Main Glass Modal Container */}
-      <div ref={containerRef} className="nyxi-settings-container custom-scrollbar">
+      <div ref={containerRef} className="nyxi-settings-container custom-scrollbar" tabIndex={-1}>
         {/* Header */}
         <header className="nyxi-settings-header">
           <div className="nyxi-settings-title" id="settings-modal-title">
@@ -141,10 +153,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
         {/* Tab Content Panes */}
         <main className="w-full" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-          {activeTab === 'wallpaper' && <WallpaperTabContent />}
-          {activeTab === 'widgets' && <WidgetsTabContent />}
-          {activeTab === 'filters' && <FiltersTabContent />}
-          {activeTab === 'data' && <DataTabContent />}
+          {isContentReady ? (
+            <>
+              {activeTab === 'wallpaper' && <WallpaperTabContent />}
+              {activeTab === 'widgets' && <WidgetsTabContent />}
+              {activeTab === 'filters' && <FiltersTabContent />}
+              {activeTab === 'data' && <DataTabContent />}
+            </>
+          ) : (
+            <div className="nyxi-settings-panel-placeholder" aria-hidden="true" />
+          )}
         </main>
       </div>
     </div>

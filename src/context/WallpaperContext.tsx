@@ -69,8 +69,16 @@ export const WallpaperProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [wallpapers, activeWallpaperId]
   );
 
-  // Load from storage on mount
+  // Load from storage & preload presets on mount
   useEffect(() => {
+    // Preload default preset wallpaper images into browser cache instantly
+    presetWallpapers.forEach((wp) => {
+      if (wp.url) {
+        const img = new Image();
+        img.src = wp.url;
+      }
+    });
+
     const loadWallpapers = async () => {
       const savedCustom = await storage.get<WallpaperItem[]>('custom_wallpapers', []);
       const validCustom: WallpaperItem[] = [];
@@ -116,25 +124,34 @@ export const WallpaperProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     loadWallpapers();
   }, []);
 
-  // Dynamically resolve custom blob URLs and manage memory allocation
+  // Parallelize custom blob URL resolution on app start
   useEffect(() => {
     if (!loaded) return;
 
-    const urlsMap: Record<string, string> = {};
     let isSubscribed = true;
+    let createdUrlsMap: Record<string, string> = {};
 
     const resolveAll = async () => {
-      for (const wp of customWallpapers) {
-        try {
-          const blob = await wallpaperDB.get(wp.id);
-          if (blob && isSubscribed) {
-            urlsMap[wp.id] = URL.createObjectURL(blob);
+      const entries = await Promise.all(
+        customWallpapers.map(async (wp) => {
+          try {
+            const blob = await wallpaperDB.get(wp.id);
+            if (blob && isSubscribed) {
+              return [wp.id, URL.createObjectURL(blob)] as const;
+            }
+          } catch (e) {
+            console.error('Error resolving thumbnail:', e);
           }
-        } catch (e) {
-          console.error('Error resolving thumbnail:', e);
-        }
-      }
+          return null;
+        })
+      );
+
       if (isSubscribed) {
+        const urlsMap: Record<string, string> = {};
+        entries.forEach((entry) => {
+          if (entry) urlsMap[entry[0]] = entry[1];
+        });
+        createdUrlsMap = urlsMap;
         setResolvedUrlsMap(urlsMap);
       }
     };
@@ -143,8 +160,7 @@ export const WallpaperProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     return () => {
       isSubscribed = false;
-      // Revoke all created URLs to avoid memory leaks
-      Object.values(urlsMap).forEach((url) => {
+      Object.values(createdUrlsMap).forEach((url) => {
         URL.revokeObjectURL(url);
       });
     };

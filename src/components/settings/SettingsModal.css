@@ -18,6 +18,8 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   pointer-events: auto;
+  animation: settingsBackdropIn 0.18s ease-out forwards;
+  will-change: opacity;
 }
 
 .nyxi-settings-container {
@@ -42,6 +44,10 @@
   color: #ffffff;
   box-sizing: border-box;
   animation: slideInFromRight 0.18s ease-out forwards;
+  contain: layout paint;
+  transform: translate3d(20px, 0, 0);
+  will-change: transform, opacity;
+  outline: none;
 }
 
 @keyframes slideInFromRight {
@@ -53,6 +59,19 @@
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
+}
+
+@keyframes settingsBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.nyxi-settings-panel-placeholder {
+  min-height: 430px;
 }
 
 /* Header */
