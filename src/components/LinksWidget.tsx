@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Globe, Folder } from 'lucide-react';
+import { Plus, X, Folder } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { storage } from '../utils/storage';
 import { GlassCard } from './GlassCard';
@@ -111,15 +111,6 @@ export const LinksWidget: React.FC = () => {
     saveQuickLinks(updated);
   };
 
-  const getFaviconUrl = (url: string) => {
-    try {
-      const hostname = new URL(url).hostname;
-      return `https://www.google.com/s2/favicons?sz=64&domain=${hostname}`;
-    } catch {
-      return '';
-    }
-  };
-
   const renderBookmarkNode = (node: ChromeBookmarkNode) => {
     if (node.url) {
       return (
@@ -128,14 +119,9 @@ export const LinksWidget: React.FC = () => {
           href={node.url}
           className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 border border-transparent hover:border-white/5 transition-all text-white text-sm"
         >
-          <img
-            src={getFaviconUrl(node.url)}
-            alt=""
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-            className="w-5 h-5 rounded-md object-contain"
-          />
+          <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/80">
+            {node.title.charAt(0).toUpperCase()}
+          </div>
           <span className="truncate flex-1 font-medium">{node.title}</span>
         </a>
       );
@@ -214,18 +200,10 @@ export const LinksWidget: React.FC = () => {
                   <X className="w-3.5 h-3.5" />
                 </button>
 
-                <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
-                  <img
-                    src={getFaviconUrl(link.url)}
-                    alt=""
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const sibling = e.currentTarget.nextElementSibling;
-                      if (sibling) sibling.removeAttribute('style');
-                    }}
-                    className="w-8 h-8 rounded-lg object-contain"
-                  />
-                  <Globe className="w-6 h-6 text-white/30 hidden" />
+                <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
+                  <span className="text-lg font-bold text-white/90 uppercase">
+                    {link.title.charAt(0)}
+                  </span>
                 </div>
                 <span className="text-white/80 font-medium text-sm truncate w-full px-1">
                   {link.title}

@@ -6,12 +6,14 @@ export const ClockWidget: React.FC = () => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
+    // If seconds are shown, tick every 1s. Otherwise tick every 10s for efficiency
+    const intervalMs = settings.showSeconds ? 1000 : 10000;
     const timer = setInterval(() => {
       setTime(new Date());
-    }, 1000);
+    }, intervalMs);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [settings.showSeconds]);
 
   const formatTime = () => {
     let hours = time.getHours();

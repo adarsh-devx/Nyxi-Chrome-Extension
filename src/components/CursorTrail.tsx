@@ -43,8 +43,6 @@ export const CursorTrail: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationId: number;
-
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -105,8 +103,14 @@ export const CursorTrail: React.FC = () => {
     window.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseover', handleMouseOver);
 
-    // Dynamic animation loop (60 FPS)
+    let animationId: number | null = null;
+
     const render = () => {
+      if (document.hidden) {
+        animationId = null;
+        return;
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const mouse = mouseRef.current;
@@ -182,12 +186,23 @@ export const CursorTrail: React.FC = () => {
 
     render();
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden && animationId === null) {
+        animationId = requestAnimationFrame(render);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseover', handleMouseOver);
-      cancelAnimationFrame(animationId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+      }
       document.body.style.cursor = 'default';
     };
   }, [settings.cursorEffect, settings.accentColor]);

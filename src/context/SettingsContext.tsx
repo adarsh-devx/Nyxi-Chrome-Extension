@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+/* oxlint-disable react/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { storage } from '../utils/storage';
 
 export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
   accentColor: string;
-  animationSpeed: number; // multiplier (e.g. 1 = normal, 0.5 = fast, 0 = none)
-  blur: number; // px (0 to 20)
-  brightness: number; // percentage (20 to 100)
-  glassOpacity: number; // opacity (0.1 to 0.9)
+  animationSpeed: number;
+  blur: number;
+  brightness: number;
+  glassOpacity: number;
   clockFormat: '12h' | '24h';
   showSeconds: boolean;
   showDate: boolean;
@@ -23,7 +24,7 @@ export interface AppSettings {
 
 const defaultSettings: AppSettings = {
   theme: 'dark',
-  accentColor: '#8b5cf6', // Indigo/violet accent
+  accentColor: '#8b5cf6',
   animationSpeed: 1,
   blur: 8,
   brightness: 75,
@@ -62,38 +63,85 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loaded, setLoaded] = useState(false);
 
+  const pendingSettingsRef = useRef<AppSettings | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
       const saved = await storage.get<AppSettings>('app_settings', defaultSettings);
-      // Merge with defaultSettings to ensure future added keys are present
-      setSettings({ ...defaultSettings, ...saved });
+      const merged = { ...defaultSettings, ...saved };
+      setSettings(merged);
+      pendingSettingsRef.current = merged;
       setLoaded(true);
     };
     loadSettings();
   }, []);
 
-  // Save settings when changed
-  const updateSettings = async (newSettings: Partial<AppSettings>) => {
+  // Flush pending debounced writes immediately
+  const flushPendingWrite = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (pendingSettingsRef.current) {
+      storage.set('app_settings', pendingSettingsRef.current);
+    }
+  }, []);
+
+  // Ensure un-persisted slider edits are written on unload or tab hide
+  useEffect(() => {
+    const handleUnloadOrHide = () => {
+      if (document.hidden) {
+        flushPendingWrite();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushPendingWrite);
+    document.addEventListener('visibilitychange', handleUnloadOrHide);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingWrite);
+      document.removeEventListener('visibilitychange', handleUnloadOrHide);
+      flushPendingWrite();
+    };
+  }, [flushPendingWrite]);
+
+  // Update settings with immediate UI state update & 300ms debounced storage persistence
+  const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings };
-      storage.set('app_settings', updated);
+      pendingSettingsRef.current = updated;
+
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(() => {
+        if (pendingSettingsRef.current) {
+          storage.set('app_settings', pendingSettingsRef.current);
+        }
+      }, 300);
+
       return updated;
     });
-  };
+  }, []);
 
-  const resetSettings = async () => {
+  const resetSettings = useCallback(async () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
     setSettings(defaultSettings);
+    pendingSettingsRef.current = defaultSettings;
     await storage.set('app_settings', defaultSettings);
-  };
+  }, []);
 
-  // Apply settings to document styles dynamically
+  // Apply CSS custom properties dynamically
   useEffect(() => {
     if (!loaded) return;
 
     const root = document.documentElement;
-
-    // Apply colors and theme custom custom styling variables
     root.style.setProperty('--accent-color', settings.accentColor);
     root.style.setProperty('--accent-color-rgb', hexToRgb(settings.accentColor));
     root.style.setProperty('--bg-blur', `${settings.blur}px`);
@@ -101,7 +149,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     root.style.setProperty('--glass-opacity', `${settings.glassOpacity}`);
     root.style.setProperty('--anim-duration', `${0.3 * settings.animationSpeed}s`);
 
-    // Handle Theme class toggles
     const isDark =
       settings.theme === 'dark' ||
       (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -115,7 +162,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [settings, loaded]);
 
-  // Listen to system theme changes if system theme is selected
+  // Listen to system theme changes
   useEffect(() => {
     if (settings.theme !== 'system') return;
 
@@ -135,16 +182,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [settings.theme]);
 
-  if (!loaded) {
-    // Prevent flash of unstyled content during load
-    return null;
-  }
-
-  return (
-    <SettingsContext.Provider value={{ settings, updateSettings, resetSettings }}>
-      {children}
-    </SettingsContext.Provider>
+  const value = useMemo(
+    () => ({ settings, updateSettings, resetSettings }),
+    [settings, updateSettings, resetSettings]
   );
+
+  if (!loaded) return null;
+
+  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 };
 
 export const useSettings = () => {

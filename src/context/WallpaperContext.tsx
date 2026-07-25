@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+/* oxlint-disable react/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { storage } from '../utils/storage';
 import { wallpaperDB } from '../utils/wallpaperDB';
 
 export interface WallpaperItem {
   id: string;
   name: string;
-  type: 'image' | 'video' | 'dynamic';
+  type: 'image' | 'video';
   url: string; // empty string for custom wallpapers stored in IndexedDB
   isCustom?: boolean;
 }
@@ -28,12 +29,6 @@ const presetWallpapers: WallpaperItem[] = [
     name: 'Luxury Waves',
     type: 'image',
     url: '/default_wallpapers/abstract.png',
-  },
-  {
-    id: 'dynamic-particles',
-    name: 'Ambient Stars (Dynamic)',
-    type: 'dynamic',
-    url: '',
   },
 ];
 
@@ -67,31 +62,53 @@ export const WallpaperProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loaded, setLoaded] = useState<boolean>(false);
   const [resolvedUrlsMap, setResolvedUrlsMap] = useState<Record<string, string>>({});
 
-  // Combine presets and custom wallpapers
-  const wallpapers = [...presetWallpapers, ...customWallpapers];
-  const activeWallpaper = wallpapers.find((w) => w.id === activeWallpaperId) || presetWallpapers[0];
+  // Combine presets and custom wallpapers with useMemo
+  const wallpapers = useMemo(() => [...presetWallpapers, ...customWallpapers], [customWallpapers]);
+  const activeWallpaper = useMemo(
+    () => wallpapers.find((w: WallpaperItem) => w.id === activeWallpaperId) || presetWallpapers[0],
+    [wallpapers, activeWallpaperId]
+  );
 
   // Load from storage on mount
   useEffect(() => {
     const loadWallpapers = async () => {
       const savedCustom = await storage.get<WallpaperItem[]>('custom_wallpapers', []);
+      const validCustom: WallpaperItem[] = [];
+
+      for (const item of savedCustom) {
+        if (item.isCustom) {
+          const hasBlob = await wallpaperDB.hasWallpaper(item.id);
+          if (hasBlob) {
+            validCustom.push(item);
+          }
+        }
+      }
+
+      if (validCustom.length !== savedCustom.length) {
+        await storage.set('custom_wallpapers', validCustom);
+      }
+
       const savedActiveId = await storage.get<string>('active_wallpaper_id', 'nature');
       const savedMuted = await storage.get<boolean>('wallpaper_video_muted', true);
       const savedLoop = await storage.get<boolean>('wallpaper_video_loop', true);
       const savedShuffle = await storage.get<boolean>('wallpaper_shuffle_enabled', false);
 
-      setCustomWallpapers(savedCustom);
-      setVideoMuted(savedMuted);
+      setCustomWallpapers(validCustom);
+      setIsVideoMuted(savedMuted);
       setShouldLoop(savedLoop);
       setShuffleEnabled(savedShuffle);
 
-      if (savedShuffle) {
-        // Pick a random wallpaper on tab load if shuffle is enabled
-        const all = [...presetWallpapers, ...savedCustom];
+      const all = [...presetWallpapers, ...validCustom];
+      const activeExists = all.some((w) => w.id === savedActiveId);
+
+      if (savedShuffle && all.length > 0) {
         const randomItem = all[Math.floor(Math.random() * all.length)];
         setActiveWallpaperId(randomItem.id);
-      } else {
+      } else if (activeExists) {
         setActiveWallpaperId(savedActiveId);
+      } else {
+        setActiveWallpaperId('nature');
+        await storage.set('active_wallpaper_id', 'nature');
       }
       setLoaded(true);
     };
@@ -133,104 +150,129 @@ export const WallpaperProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [customWallpapers, loaded]);
 
-  const getWallpaperUrl = (wp: WallpaperItem): string => {
-    if (wp.isCustom) {
-      return resolvedUrlsMap[wp.id] || '';
-    }
-    return wp.url;
-  };
+  const getWallpaperUrl = useCallback(
+    (wp: WallpaperItem): string => {
+      if (wp.isCustom) {
+        return resolvedUrlsMap[wp.id] || '';
+      }
+      return wp.url;
+    },
+    [resolvedUrlsMap]
+  );
 
-  const setActiveWallpaperById = async (id: string) => {
+  const setActiveWallpaperById = useCallback(async (id: string) => {
     setActiveWallpaperId(id);
     await storage.set('active_wallpaper_id', id);
-  };
+  }, []);
 
-  const uploadWallpaper = async (file: File): Promise<void> => {
-    const id = `custom-${Date.now()}`;
-    const type: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+  const uploadWallpaper = useCallback(
+    async (file: File): Promise<void> => {
+      const id = `custom-${Date.now()}`;
+      const type: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
 
-    // Store binary file directly in IndexedDB
-    await wallpaperDB.save(id, file);
+      await wallpaperDB.save(id, file);
 
-    const newItem: WallpaperItem = {
-      id,
-      name: file.name.split('.')[0] || 'Uploaded Media',
-      type,
-      url: '', // url is resolved at runtime from IndexedDB
-      isCustom: true,
-    };
+      const newItem: WallpaperItem = {
+        id,
+        name: file.name.split('.')[0] || 'Uploaded Media',
+        type,
+        url: '',
+        isCustom: true,
+      };
 
-    const updated = [...customWallpapers, newItem];
-    setCustomWallpapers(updated);
-    await storage.set('custom_wallpapers', updated);
-    await setActiveWallpaperById(id);
-  };
+      setCustomWallpapers((prev) => {
+        const updated = [...prev, newItem];
+        storage.set('custom_wallpapers', updated);
+        return updated;
+      });
+      await setActiveWallpaperById(id);
+    },
+    [setActiveWallpaperById]
+  );
 
-  const deleteWallpaper = async (id: string) => {
-    const updated = customWallpapers.filter((w) => w.id !== id);
-    setCustomWallpapers(updated);
-    await storage.set('custom_wallpapers', updated);
+  const deleteWallpaper = useCallback(
+    async (id: string) => {
+      setCustomWallpapers((prev) => {
+        const updated = prev.filter((w) => w.id !== id);
+        storage.set('custom_wallpapers', updated);
+        return updated;
+      });
 
-    // Delete binary file from IndexedDB
-    await wallpaperDB.delete(id);
+      await wallpaperDB.delete(id);
 
-    // If the active wallpaper was deleted, switch back to default
-    if (activeWallpaperId === id) {
-      await setActiveWallpaperById('nature');
-    }
-  };
+      if (activeWallpaperId === id) {
+        await setActiveWallpaperById('nature');
+      }
+    },
+    [activeWallpaperId, setActiveWallpaperById]
+  );
 
-  const setVideoPlaying = (playing: boolean) => {
+  const setVideoPlaying = useCallback((playing: boolean) => {
     setIsVideoPlaying(playing);
-  };
+  }, []);
 
-  const setVideoMuted = async (muted: boolean) => {
+  const setVideoMuted = useCallback(async (muted: boolean) => {
     setIsVideoMuted(muted);
     await storage.set('wallpaper_video_muted', muted);
-  };
+  }, []);
 
-  const setShouldLoopState = async (loop: boolean) => {
+  const setShouldLoopState = useCallback(async (loop: boolean) => {
     setShouldLoop(loop);
     await storage.set('wallpaper_video_loop', loop);
-  };
+  }, []);
 
-  const setShuffleEnabledState = async (shuffle: boolean) => {
+  const setShuffleEnabledState = useCallback(async (shuffle: boolean) => {
     setShuffleEnabled(shuffle);
     await storage.set('wallpaper_shuffle_enabled', shuffle);
-  };
+  }, []);
 
-  const triggerRandomWallpaper = () => {
-    const filterPresets = wallpapers.filter((w) => w.id !== activeWallpaperId);
+  const triggerRandomWallpaper = useCallback(() => {
+    const filterPresets = wallpapers.filter((w: WallpaperItem) => w.id !== activeWallpaperId);
     if (filterPresets.length === 0) return;
     const randomItem = filterPresets[Math.floor(Math.random() * filterPresets.length)];
     setActiveWallpaperId(randomItem.id);
-  };
+  }, [wallpapers, activeWallpaperId]);
+
+  const value = useMemo(
+    () => ({
+      wallpapers,
+      activeWallpaper,
+      isVideoPlaying,
+      isVideoMuted,
+      shouldLoop,
+      isShuffleEnabled,
+      setActiveWallpaperById,
+      uploadWallpaper,
+      deleteWallpaper,
+      setVideoPlaying,
+      setVideoMuted,
+      setShouldLoop: setShouldLoopState,
+      setShuffleEnabled: setShuffleEnabledState,
+      triggerRandomWallpaper,
+      getWallpaperUrl,
+    }),
+    [
+      wallpapers,
+      activeWallpaper,
+      isVideoPlaying,
+      isVideoMuted,
+      shouldLoop,
+      isShuffleEnabled,
+      setActiveWallpaperById,
+      uploadWallpaper,
+      deleteWallpaper,
+      setVideoPlaying,
+      setVideoMuted,
+      setShouldLoopState,
+      setShuffleEnabledState,
+      triggerRandomWallpaper,
+      getWallpaperUrl,
+    ]
+  );
 
   if (!loaded) return null;
 
-  return (
-    <WallpaperContext.Provider
-      value={{
-        wallpapers,
-        activeWallpaper,
-        isVideoPlaying,
-        isVideoMuted,
-        shouldLoop,
-        isShuffleEnabled,
-        setActiveWallpaperById,
-        uploadWallpaper,
-        deleteWallpaper,
-        setVideoPlaying,
-        setVideoMuted,
-        setShouldLoop: setShouldLoopState,
-        setShuffleEnabled: setShuffleEnabledState,
-        triggerRandomWallpaper,
-        getWallpaperUrl,
-      }}
-    >
-      {children}
-    </WallpaperContext.Provider>
-  );
+  return <WallpaperContext.Provider value={value}>{children}</WallpaperContext.Provider>;
 };
 
 export const useWallpaper = () => {
