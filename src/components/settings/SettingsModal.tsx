@@ -21,33 +21,8 @@ const TABS: { key: SettingsTabKey; label: string; icon: React.ReactNode }[] = [
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('wallpaper');
-  const [isRendered, setIsRendered] = useState(isOpen);
-  const [isClosing, setIsClosing] = useState(false);
-  const [isContentReady, setIsContentReady] = useState(false);
-
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
-
-  // Smooth open / exit animation state sync
-  useEffect(() => {
-    if (isOpen) {
-      setIsRendered(true);
-      setIsClosing(false);
-      // Defer heavy tab DOM node creation by 1 frame so slide-in animation starts instantly with 0 jank
-      const raf = requestAnimationFrame(() => {
-        setIsContentReady(true);
-      });
-      return () => cancelAnimationFrame(raf);
-    } else if (isRendered) {
-      setIsClosing(true);
-      setIsContentReady(false);
-      const timer = setTimeout(() => {
-        setIsRendered(false);
-        setIsClosing(false);
-      }, 220);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, isRendered]);
 
   // Focus Restore: Capture activeElement when modal opens, restore on close
   useEffect(() => {
@@ -58,7 +33,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
         firstFocusable?.focus();
-      }, 50);
+      }, 30);
     } else if (previousActiveElementRef.current && document.body.contains(previousActiveElementRef.current)) {
       previousActiveElementRef.current.focus();
     }
@@ -112,23 +87,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, activeTab, onClose]);
 
-  if (!isRendered) return null;
+  if (!isOpen) return null;
 
   return (
     <div
-      className={`nyxi-settings-overlay ${isClosing ? 'closing' : ''}`}
+      className="nyxi-settings-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
     >
       {/* Backdrop */}
-      <div className={`nyxi-settings-backdrop ${isClosing ? 'closing' : ''}`} onClick={onClose} />
+      <div className="nyxi-settings-backdrop" onClick={onClose} />
 
       {/* Main Glass Modal Container */}
-      <div
-        ref={containerRef}
-        className={`nyxi-settings-container custom-scrollbar ${isClosing ? 'closing' : ''}`}
-      >
+      <div ref={containerRef} className="nyxi-settings-container custom-scrollbar">
         {/* Header */}
         <header className="nyxi-settings-header">
           <div className="nyxi-settings-title" id="settings-modal-title">
@@ -169,14 +141,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
         {/* Tab Content Panes */}
         <main className="w-full" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-          {isContentReady && (
-            <>
-              {activeTab === 'wallpaper' && <WallpaperTabContent />}
-              {activeTab === 'widgets' && <WidgetsTabContent />}
-              {activeTab === 'filters' && <FiltersTabContent />}
-              {activeTab === 'data' && <DataTabContent />}
-            </>
-          )}
+          {activeTab === 'wallpaper' && <WallpaperTabContent />}
+          {activeTab === 'widgets' && <WidgetsTabContent />}
+          {activeTab === 'filters' && <FiltersTabContent />}
+          {activeTab === 'data' && <DataTabContent />}
         </main>
       </div>
     </div>
