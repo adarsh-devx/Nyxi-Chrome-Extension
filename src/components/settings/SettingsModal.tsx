@@ -21,20 +21,37 @@ const TABS: { key: SettingsTabKey; label: string; icon: React.ReactNode }[] = [
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('wallpaper');
+  const [isRendered, setIsRendered] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
+  // Smooth open / exit animation state sync
+  useEffect(() => {
+    if (isOpen) {
+      setIsRendered(true);
+      setIsClosing(false);
+    } else if (isRendered) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setIsRendered(false);
+        setIsClosing(false);
+      }, 220);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isRendered]);
 
   // Focus Restore: Capture activeElement when modal opens, restore on close
   useEffect(() => {
     if (isOpen) {
       previousActiveElementRef.current = document.activeElement as HTMLElement | null;
-      // Focus close button or container on mount
       setTimeout(() => {
         const firstFocusable = containerRef.current?.querySelector<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
         firstFocusable?.focus();
-      }, 50);
+      }, 40);
     } else if (previousActiveElementRef.current && document.body.contains(previousActiveElementRef.current)) {
       previousActiveElementRef.current.focus();
     }
@@ -50,7 +67,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         return;
       }
 
-      // Arrow Left / Arrow Right for Tab Pills navigation
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         const currentIndex = TABS.findIndex((t) => t.key === activeTab);
         if (currentIndex !== -1) {
@@ -63,7 +79,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         return;
       }
 
-      // Focus Trap cycling
       if (e.key === 'Tab' && containerRef.current) {
         const focusables = Array.from(
           containerRef.current.querySelectorAll<HTMLElement>(
@@ -90,20 +105,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, activeTab, onClose]);
 
-  if (!isOpen) return null;
+  if (!isRendered) return null;
 
   return (
     <div
-      className="nyxi-settings-overlay"
+      className={`nyxi-settings-overlay ${isClosing ? 'closing' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-modal-title"
     >
       {/* Backdrop */}
-      <div className="nyxi-settings-backdrop" onClick={onClose} />
+      <div className={`nyxi-settings-backdrop ${isClosing ? 'closing' : ''}`} onClick={onClose} />
 
       {/* Main Glass Modal Container */}
-      <div ref={containerRef} className="nyxi-settings-container custom-scrollbar">
+      <div
+        ref={containerRef}
+        className={`nyxi-settings-container custom-scrollbar ${isClosing ? 'closing' : ''}`}
+      >
         {/* Header */}
         <header className="nyxi-settings-header">
           <div className="nyxi-settings-title" id="settings-modal-title">
