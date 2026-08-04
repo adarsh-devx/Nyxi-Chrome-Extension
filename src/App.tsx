@@ -116,7 +116,7 @@ const DashboardContent: React.FC = () => {
               Nyxi Tab is a premium, high-performance browser extension that transforms your default screen into a personal workspace dashboard. Use the sidebar icons to access search engines, shortcuts, and background wallpapers.
             </p>
             <div className="text-xs text-white/40 border-t border-white/5 pt-4">
-              Version 1.0.0 • Made with Google DeepMind
+              Version 1.0.2 • Made with Google DeepMind
             </div>
           </div>
         </div>

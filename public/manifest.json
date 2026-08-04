@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nyxi Tab",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A premium, fully customizable new tab page with stunning backgrounds and elegant layouts.",
   "chrome_url_overrides": {
     "newtab": "index.html"
