@@ -6,7 +6,7 @@ export const FiltersTabContent: React.FC = () => {
   const { settings, updateSettings } = useSettings();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="max-w-[820px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-5">
       <div className="nyxi-card-section">
         <h4 className="nyxi-card-title">
           <Sliders className="w-4 h-4 text-[var(--accent-color,#8b5cf6)]" />

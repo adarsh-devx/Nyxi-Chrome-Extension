@@ -37,7 +37,7 @@ export const DataTabContent: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="max-w-[820px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-5">
       <div className="nyxi-card-section">
         <h4 className="nyxi-card-title">
           <Database className="w-4 h-4 text-[var(--accent-color,#8b5cf6)]" />
@@ -45,19 +45,19 @@ export const DataTabContent: React.FC = () => {
         </h4>
         <p className="nyxi-card-subtitle">Export or import your complete dashboard customization JSON file.</p>
 
-        <div className="grid grid-cols-2 gap-3 mt-2">
+        <div className="nyxi-data-btn-group">
           <button
             type="button"
             onClick={handleExport}
-            className="py-2.5 px-4 bg-white/5 border border-white/10 hover:border-white/20 text-white hover:bg-white/10 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="nyxi-data-btn"
           >
-            <Download className="w-4 h-4 text-[var(--accent-color,#8b5cf6)]" />
-            Export JSON
+            <Download className="w-4 h-4 text-[var(--accent-color,#8b5cf6)] flex-shrink-0" />
+            <span>Export JSON</span>
           </button>
 
-          <label className="py-2.5 px-4 bg-white/5 border border-white/10 hover:border-white/20 text-white hover:bg-white/10 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer text-center">
-            <Upload className="w-4 h-4 text-[var(--accent-color,#8b5cf6)]" />
-            Import JSON
+          <label className="nyxi-data-btn">
+            <Upload className="w-4 h-4 text-[var(--accent-color,#8b5cf6)] flex-shrink-0" />
+            <span>Import JSON</span>
             <input type="file" accept=".json" onChange={handleImport} className="hidden" />
           </label>
         </div>
@@ -69,7 +69,7 @@ export const DataTabContent: React.FC = () => {
           Reset & Factory Defaults
         </h4>
 
-        <div className="flex flex-col gap-3 mt-1">
+        <div className="nyxi-data-btn-group">
           <button
             type="button"
             onClick={() => {
@@ -77,10 +77,10 @@ export const DataTabContent: React.FC = () => {
                 resetSettings();
               }
             }}
-            className="py-2.5 px-4 bg-red-950/20 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/20 text-red-300 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="nyxi-data-btn-danger-light"
           >
-            <RotateCcw className="w-4 h-4" />
-            Reset Preferences
+            <RotateCcw className="w-4 h-4 flex-shrink-0" />
+            <span>Reset Preferences</span>
           </button>
 
           <button
@@ -95,10 +95,10 @@ export const DataTabContent: React.FC = () => {
                 window.location.reload();
               }
             }}
-            className="py-2.5 px-4 bg-red-500/10 border border-red-500/35 hover:bg-red-500 hover:text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all text-red-200 cursor-pointer"
+            className="nyxi-data-btn-danger-strong"
           >
-            <Trash2 className="w-4 h-4" />
-            Factory Reset Everything
+            <Trash2 className="w-4 h-4 flex-shrink-0" />
+            <span>Factory Reset Everything</span>
           </button>
         </div>
       </div>
