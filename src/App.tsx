@@ -5,7 +5,6 @@ import { WallpaperRenderer } from './components/WallpaperRenderer';
 import { ClockWidget } from './components/ClockWidget';
 import { SearchWidget } from './components/SearchWidget';
 import { LinksWidget } from './components/LinksWidget';
-import { CursorTrail } from './components/CursorTrail';
 import { SettingsDrawer } from './components/settings/SettingsDrawer';
 import { User, Search, LayoutGrid, Settings, HelpCircle, X } from 'lucide-react';
 
@@ -20,10 +19,7 @@ const DashboardContent: React.FC = () => {
       {/* 1. Dynamic Wallpaper Background */}
       <WallpaperRenderer />
 
-      {/* 2. Interactive Cursor trail overlay */}
-      <CursorTrail />
-
-      {/* 3. Left Center Sidebar Pill Dock */}
+      {/* 2. Left Center Sidebar Pill Dock */}
       <div className="sidebar-dock animate-fade-in">
         {/* Profile Button */}
         <button

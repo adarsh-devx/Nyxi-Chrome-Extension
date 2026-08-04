@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './SettingsModal.css';
-import { Settings, X, Image as ImageIcon, Box, Sparkles, BarChart3 } from 'lucide-react';
+import { Settings, X, Image as ImageIcon, Sparkles, BarChart3 } from 'lucide-react';
 import type { SettingsTabKey } from '../../types/settingsUI';
 import { WallpaperTabContent } from './tabs/WallpaperTabContent';
-import { WidgetsTabContent } from './tabs/WidgetsTabContent';
 import { FiltersTabContent } from './tabs/FiltersTabContent';
 import { DataTabContent } from './tabs/DataTabContent';
 
@@ -14,7 +13,6 @@ interface SettingsModalProps {
 
 const TABS: { key: SettingsTabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'wallpaper', label: 'WALLPAPER', icon: <ImageIcon className="w-4 h-4" /> },
-  { key: 'widgets', label: 'WIDGETS', icon: <Box className="w-4 h-4" /> },
   { key: 'filters', label: 'FILTERS', icon: <Sparkles className="w-4 h-4" /> },
   { key: 'data', label: 'DATA', icon: <BarChart3 className="w-4 h-4" /> },
 ];
@@ -142,7 +140,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         {/* Tab Content Panes - Mounted & Pre-loaded for 0ms Instant Response */}
         <main className="w-full" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
           {activeTab === 'wallpaper' && <WallpaperTabContent />}
-          {activeTab === 'widgets' && <WidgetsTabContent />}
           {activeTab === 'filters' && <FiltersTabContent />}
           {activeTab === 'data' && <DataTabContent />}
         </main>

@@ -1,4 +1,4 @@
-export type SettingsTabKey = 'wallpaper' | 'widgets' | 'filters' | 'data';
+export type SettingsTabKey = 'wallpaper' | 'filters' | 'data';
 
 export interface ThemeSwatch {
   name: string;
