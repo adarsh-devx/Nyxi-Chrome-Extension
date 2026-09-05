@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Folder } from 'lucide-react';
+import { Plus, X, Folder, LayoutGrid, MousePointerClick } from 'lucide-react';
 import { useSettings } from '../context/SettingsContext';
 import { storage } from '../utils/storage';
 import { GlassCard } from './GlassCard';
@@ -24,6 +24,23 @@ const defaultQuickLinks: QuickLinkItem[] = [
   { id: '4', title: 'Reddit', url: 'https://reddit.com' },
 ];
 
+const getHostname = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
+const getFaviconUrl = (url: string): string =>
+  `https://www.google.com/s2/favicons?domain=${encodeURIComponent(getHostname(url))}&sz=64`;
+
+const countBookmarkLeaves = (nodes: ChromeBookmarkNode[]): number =>
+  nodes.reduce(
+    (sum, n) => sum + (n.url ? 1 : n.children ? countBookmarkLeaves(n.children) : 0),
+    0
+  );
+
 const mockChromeBookmarks: ChromeBookmarkNode[] = [
   { id: 'b1', title: 'Dev Links', children: [
       { id: 'b1-1', title: 'Stack Overflow', url: 'https://stackoverflow.com' },
@@ -34,6 +51,9 @@ const mockChromeBookmarks: ChromeBookmarkNode[] = [
   { id: 'b3', title: 'Tailwind CSS', url: 'https://tailwindcss.com' },
 ];
 
+/* Bump when defaultQuickLinks changes so saved lists get missing defaults merged in once */
+const QUICK_LINKS_VERSION = 2;
+
 export const LinksWidget: React.FC = () => {
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'quick' | 'bookmarks'>('quick');
@@ -43,12 +63,33 @@ export const LinksWidget: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
+
+  const handleFaviconError = (url: string) => {
+    setFailedFavicons((prev) => new Set(prev).add(url));
+  };
 
   // Load custom Quick Links
   useEffect(() => {
     const loadQuickLinks = async () => {
       const saved = await storage.get<QuickLinkItem[]>('quick_links', defaultQuickLinks);
-      setQuickLinks(saved);
+      const savedVersion = await storage.get<number>('quick_links_version', 1);
+
+      if (savedVersion < QUICK_LINKS_VERSION) {
+        // Merge any missing default shortcuts (e.g. Gmail) into the saved list
+        const merged = [...saved];
+        for (const def of defaultQuickLinks) {
+          const exists = merged.some(
+            (l) => l.url.replace(/\/+$/, '') === def.url.replace(/\/+$/, '')
+          );
+          if (!exists) merged.push(def);
+        }
+        await storage.set('quick_links', merged);
+        await storage.set('quick_links_version', QUICK_LINKS_VERSION);
+        setQuickLinks(merged);
+      } else {
+        setQuickLinks(saved);
+      }
       setLoaded(true);
     };
     loadQuickLinks();
@@ -112,17 +153,31 @@ export const LinksWidget: React.FC = () => {
   };
 
   const renderBookmarkNode = (node: ChromeBookmarkNode) => {
-    if (node.url) {
+    const nodeUrl = node.url;
+    if (nodeUrl) {
       return (
         <a
           key={node.id}
-          href={node.url}
-          className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 border border-transparent hover:border-white/5 transition-all text-white text-sm"
+          href={nodeUrl}
+          className="flex items-center gap-3 p-3 rounded-xl glass-bookmark-row transition-all text-white text-sm"
         >
-          <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/80">
-            {node.title.charAt(0).toUpperCase()}
+          <div className="w-6 h-6 rounded-lg favicon-box flex items-center justify-center flex-shrink-0">
+            {failedFavicons.has(nodeUrl) ? (
+              <span className="text-[10px] font-bold text-white/80">
+                {node.title.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <img
+                src={getFaviconUrl(nodeUrl)}
+                alt=""
+                loading="lazy"
+                onError={() => handleFaviconError(nodeUrl)}
+                className="w-4 h-4 rounded"
+              />
+            )}
           </div>
           <span className="truncate flex-1 font-medium">{node.title}</span>
+          <span className="text-2xs text-white/30 flex-shrink-0">{getHostname(nodeUrl)}</span>
         </a>
       );
     }
@@ -145,73 +200,104 @@ export const LinksWidget: React.FC = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col gap-4">
-      {/* Navigation Headers */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex gap-4">
-          <button
-            onClick={() => setActiveTab('quick')}
-            className={`text-sm font-semibold tracking-wider uppercase pb-1 border-b-2 transition-all ${
-              activeTab === 'quick'
-                ? 'border-[var(--accent-color)] text-white'
-                : 'border-transparent text-white/45 hover:text-white/70'
-            }`}
-          >
-            Quick Links
-          </button>
-          <button
-            onClick={() => setActiveTab('bookmarks')}
-            className={`text-sm font-semibold tracking-wider uppercase pb-1 border-b-2 transition-all ${
-              activeTab === 'bookmarks'
-                ? 'border-[var(--accent-color)] text-white'
-                : 'border-transparent text-white/45 hover:text-white/70'
-            }`}
-          >
-            Bookmarks
-          </button>
+      {/* Widget Header: identity + segmented tabs */}
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="nyxi-links-icon w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+            <LayoutGrid className="w-4 h-4" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-sm font-bold text-white truncate">Shortcuts & Bookmarks</h2>
+            <span className="text-2xs font-semibold uppercase tracking-widest text-white/40">
+              {activeTab === 'quick'
+                ? `${quickLinks.length} saved`
+                : `${countBookmarkLeaves(chromeBookmarks)} from Chrome`}
+            </span>
+          </div>
         </div>
 
-        {activeTab === 'quick' && (
-          <button
-            onClick={() => setIsAdding(!isAdding)}
-            className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-            title="Add Quick Link"
-          >
-            <Plus className="w-4.5 h-4.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {activeTab === 'quick' && (
+            <button
+              onClick={() => setIsAdding(!isAdding)}
+              className="nyxi-add-btn p-2 rounded-xl"
+              title="Add Shortcut"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+          <div className="nyxi-segmented">
+            <button
+              onClick={() => setActiveTab('quick')}
+              className={`nyxi-segmented-btn ${activeTab === 'quick' ? 'active' : ''}`}
+            >
+              Links
+            </button>
+            <button
+              onClick={() => setActiveTab('bookmarks')}
+              className={`nyxi-segmented-btn ${activeTab === 'bookmarks' ? 'active' : ''}`}
+            >
+              Bookmarks
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Tab Contents */}
-      <GlassCard className="!p-4 min-h-[120px] max-h-[380px] overflow-y-auto custom-scrollbar">
-        {activeTab === 'quick' && (
-          <div className="grid grid-cols-3 gap-3">
-            {quickLinks.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                className="group relative flex flex-col items-center justify-center p-4 rounded-xl quick-link-tile text-center"
+      <GlassCard className="nyxi-links-card overflow-y-auto custom-scrollbar">
+        {activeTab === 'quick' &&
+          (quickLinks.length === 0 ? (
+            <div className="nyxi-empty-state py-8">
+              <div className="nyxi-links-icon w-11 h-11 rounded-xl flex items-center justify-center">
+                <MousePointerClick className="w-5 h-5" />
+              </div>
+              <p className="text-sm font-semibold text-white/80 mt-1">No shortcuts yet</p>
+              <p className="text-xs text-white/40">Add your favourite sites for one-tap access</p>
+              <button
+                onClick={() => setIsAdding(true)}
+                className="btn-accent mt-1.5 px-5 py-2 rounded-xl text-xs font-bold"
               >
-                {/* Delete button */}
-                <button
-                  onClick={(e) => handleDeleteLink(link.id, e)}
-                  className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/40 hover:bg-red-500/70 text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
-                  title="Remove Link"
+                Add Shortcut
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {quickLinks.map((link, i) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  title={link.title}
+                  className="nyxi-tile-in group relative flex items-center justify-center p-2.5 rounded-2xl"
+                  style={{ animationDelay: `${i * 40}ms` }}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => handleDeleteLink(link.id, e)}
+                    className="absolute -top-1.5 -right-1.5 z-10 p-1 rounded-full bg-black/60 border border-white/10 text-white/60 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-red-500/80 hover:text-white transition-all"
+                    title="Remove Link"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
 
-                <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
-                  <span className="text-lg font-bold text-white/90 uppercase">
-                    {link.title.charAt(0)}
-                  </span>
-                </div>
-                <span className="text-white/80 font-medium text-sm truncate w-full px-1">
-                  {link.title}
-                </span>
-              </a>
-            ))}
-          </div>
-        )}
+                  <div className="w-8 h-8 rounded-full favicon-box flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                    {failedFavicons.has(link.url) ? (
+                      <span className="text-xs font-bold text-white/90 uppercase">
+                        {link.title.charAt(0)}
+                      </span>
+                    ) : (
+                      <img
+                        src={getFaviconUrl(link.url)}
+                        alt={link.title}
+                        loading="lazy"
+                        onError={() => handleFaviconError(link.url)}
+                        className="w-4-5 h-4-5 rounded-full"
+                      />
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+          ))}
 
         {activeTab === 'bookmarks' && (
           <div className="grid grid-cols-1 gap-2.5">
@@ -228,18 +314,18 @@ export const LinksWidget: React.FC = () => {
 
       {/* Add Quick Link Popover Modal */}
       {isAdding && activeTab === 'quick' && (
-        <GlassCard className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[360px] p-6 flex flex-col gap-4 border border-[var(--accent-color)]/30 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2">
-            <h3 className="text-white font-bold tracking-wider uppercase text-sm">Add New Link</h3>
+        <GlassCard className="nyxi-popover absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex flex-col gap-4 border border-[var(--accent-color)]/30 shadow-2xl nyxi-tile-in">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+            <h3 className="text-white font-bold tracking-wider uppercase text-sm">Add New Shortcut</h3>
             <button
               onClick={() => setIsAdding(false)}
               className="text-white/50 hover:text-white transition-colors"
             >
-              <X className="w-4.5 h-4.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <form onSubmit={handleAddLink} className="flex flex-col gap-4 mt-2">
+          <form onSubmit={handleAddLink} className="flex flex-col gap-3.5 mt-1">
             <div className="flex flex-col gap-1.5">
               <label className="text-white/60 text-xs font-semibold tracking-wider uppercase">Title</label>
               <input
@@ -248,7 +334,8 @@ export const LinksWidget: React.FC = () => {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="e.g. YouTube"
-                className="px-4 py-2 rounded-lg bg-slate-950/40 border border-white/10 outline-none text-white text-sm focus:border-[var(--accent-color)]"
+                className="nyxi-input"
+                autoFocus
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -259,13 +346,13 @@ export const LinksWidget: React.FC = () => {
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
                 placeholder="e.g. youtube.com"
-                className="px-4 py-2 rounded-lg bg-slate-950/40 border border-white/10 outline-none text-white text-sm focus:border-[var(--accent-color)]"
+                className="nyxi-input"
               />
             </div>
 
             <button
               type="submit"
-              className="mt-2 py-2.5 rounded-lg font-bold text-white text-sm btn-accent"
+              className="mt-1 py-2.5 rounded-xl font-bold text-white text-sm btn-accent"
             >
               Add Link
             </button>
