@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tooling & backups
+.freebuff/
+dist-backup-original/
